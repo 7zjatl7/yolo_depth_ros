@@ -1,0 +1,11 @@
+numpy==1.26.4
+opencv-python>=4.8.1.78
+typing-extensions>=4.4.0
+ultralytics==8.3.91
+matplotlib
+opencv-python
+torch
+torchvision
+transformers==4.49.0
+empy==3.3.4
+lark
