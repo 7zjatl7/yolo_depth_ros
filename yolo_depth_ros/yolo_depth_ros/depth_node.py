@@ -14,17 +14,22 @@ from rclpy.qos import QoSReliabilityPolicy
 from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.lifecycle import LifecycleState
-from transformers import pipeline
+# from transformers import pipeline
 
 from sensor_msgs.msg import Image
 import torch
+
+from .depth_anything_v2.dpt import DepthAnythingV2
+
+
 
 class DepthNode(LifecycleNode):
 
     def __init__(self) -> None:
         super().__init__("depth_node")
 
-        self.declare_parameter("model", "depth-anything/Depth-Anything-V2-Small-hf")
+        self.declare_parameter("model", "vitb")
+        self.declare_parameter("model_path", "depth_anything_vitb.pth")
         self.declare_parameter("device", "cuda:0")
 
         self.declare_parameter("enable", True)
@@ -32,20 +37,29 @@ class DepthNode(LifecycleNode):
         self.declare_parameter("imgsz_height", 640)
         self.declare_parameter("imgsz_width", 640)
         
-        self.declare_parameter("grayscale", False)
-        self.declare_parameter("colormap", "Spectral")
+        self.declare_parameter("max_depth", 50)
 
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT.value)
 
     def on_configure(self, state: LifecycleState) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Configuring...")
 
+        self.model_configs = {
+            'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
+            'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
+            'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
+            'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
+        }
+
         self.model = self.get_parameter("model").get_parameter_value().string_value
+        self.model_path = self.get_parameter("model_path").get_parameter_value().string_value
         self.device = self.get_parameter("device").get_parameter_value().string_value
         self.enable = self.get_parameter("enable").get_parameter_value().bool_value
         self.reliability = self.get_parameter("image_reliability").get_parameter_value().integer_value
-        self.grayscale = self.get_parameter("grayscale").get_parameter_value().bool_value
-        self.colormap = self.get_parameter("colormap").get_parameter_value().string_value
+        self.imgsz_height = self.get_parameter("imgsz_height").get_parameter_value().integer_value
+        self.imgsz_width = self.get_parameter("imgsz_width").get_parameter_value().integer_value
+        self.max_depth = self.get_parameter("max_depth").get_parameter_value().integer_value
+
 
         # detection pub
         self.image_qos_profile = QoSProfile(
@@ -66,11 +80,12 @@ class DepthNode(LifecycleNode):
     def on_activate(self, state: LifecycleState) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Activating...")
 
-        self.depth_pipe = pipeline(
-            task="depth-estimation",
-            model=self.model,
-            device=self.device
-        )
+        depth_anything = DepthAnythingV2(**{**self.model_configs[self.model], 'max_depth':self.max_depth})
+
+        ckpt = torch.load(self.model_path, map_location='cpu')
+        state_dict = ckpt['model'] if 'model' in ckpt else ckpt
+        depth_anything.load_state_dict(state_dict)
+        self.depth_anything = depth_anything.to(self.device).eval()
 
         self._sub = self.create_subscription(
             Image, 'image_raw', self.image_cb, self.image_qos_profile
@@ -115,26 +130,19 @@ class DepthNode(LifecycleNode):
     
     def image_cb(self, msg: Image) -> None:
         cv_image = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        pil_image = PILImage.fromarray(cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB))
 
-        result = self.depth_pipe(pil_image)
-        depth = np.array(result["depth"])
+        depth = self.depth_anything.infer_image(cv_image, self.imgsz_height)
 
-        depth_norm = (depth - depth.min()) / (depth.max() - depth.min() + 1e-8) * 255.0
-        depth_norm = depth_norm.astype(np.uint8)
+        # depth = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0
+        # depth = depth.astype(np.uint8)
 
-        if self.grayscale:
-            depth_img = self.cv_bridge.cv2_to_imgmsg(depth_norm, encoding="mono8")
-           
-        else:
-            cmap = matplotlib.colormaps.get_cmap(self.colormap)
-            depth_color = (cmap(depth_norm)[:, :, :3] * 255)[:, :, ::-1].astype(np.uint8)
-            depth_img = self.cv_bridge.cv2_to_imgmsg(depth_color, encoding="bgr8")
+        depth_img = self.cv_bridge.cv2_to_imgmsg(depth, encoding="32FC1")
+
 
         depth_img.header = msg.header
         self._pub.publish(depth_img)
 
-        del cv_image, pil_image, depth, depth_norm
+        del cv_image, depth
 
 
 def main():
