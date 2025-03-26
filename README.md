@@ -1,11 +1,11 @@
 <p align="center">
   <h1 align="center">YOLO_DEPTH_ROS</h1>
 </p>
-------------------------------------------------
-The codebase integrates object detection and depth estimation into a single ROS 2 pipeline, enabling distance estimation of objects using only RGB images.
+YOLO_DEPTH_ROS is an integrated ROS 2 pipeline that combines state-of-the-art object detection with depth estimation, allowing you to compute the distance of objects using only RGB images. This package is designed to work in real time and is optimized for systems with CUDA support. Whether you are developing robotics applications or building computer vision solutions, this toolkit provides a comprehensive and flexible approach to object detection and distance estimation.
+
+
 
 ## Local Setup
-------------------------------------------------
 
 ```bash
 conda create -n yolo_depth_ros python=3.10
@@ -22,11 +22,15 @@ colcon build --symlink-install
 > ✅ Tested with **CUDA 12.1** and **Python 3.10**
 
 ## Running
-------------------------------------------------
-
+Once the workspace is built, you can launch the YOLO_DEPTH_ROS pipeline using the following command:
 ```bash
-ros2 launch yolo_depth_bringup yolo_depth.launch.py det_model:=<path to trained model> dep_model:=<vits | vitb | vitl> dep_model_path:=<path to trained model>  input_image_topic:=<input image topic>
+ros2 launch yolo_depth_bringup yolo_depth.launch.py \
+  det_model:=<path to trained model> \
+  dep_model:=<vits | vitb | vitl> \
+  dep_model_path:=<path to trained model> \
+  input_image_topic:=<input image topic>
 ```
+
 
 > ⚠️ Note: Depth values may vary depending on the camera intrinsic parameters. Make sure to adjust the `fx` and `fy` values accordingly.
 
@@ -61,8 +65,7 @@ ros2 launch yolo_depth_bringup yolo_depth.launch.py det_model:=<path to trained 
 
 
 ## Docker
-------------------------------------------------
-To build the `yolo_depth_ros` Docker image:
+If you prefer using Docker, you can build and run a containerized version of YOLO_DEPTH_ROS. Follow these steps:
 
 ```bash
 docker build -t yolo_ros .
@@ -75,9 +78,7 @@ docker run -it --rm --net=host -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-u
 ```
 
 ## Models
-------------------------------------------------
-You need two models for `yolo_depth_ros`.  
-They can be downloaded from the following repositories:
+You need two models for `yolo_depth_ros`.  They can be downloaded from the following repositories:
 
 - [Depth Anything](https://github.com/DepthAnything/Depth-Anything-V2)
 - [YOLOv12](https://github.com/sunsmarterjie/yolov12)
@@ -85,9 +86,12 @@ They can be downloaded from the following repositories:
 
 
 ## Demo
-------------------------------------------------
-
+Ground truth distance between objects from the camera in virtual world
 <p align="center">
-  <img src="assets/distance_from_cam.png" width="45%" style="margin-right: 2%;">
-  <img src="assets/result.png" width="45%">
+  <img src="assets/distance_from_cam.png" width="100%">
+</p>
+
+Estimated distance between objects from the camera in virtual world
+<p align="center">
+  <img src="assets/result.png" width="100%">
 </p>
