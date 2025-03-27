@@ -9,7 +9,6 @@ from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSDurabilityPolicy, QoSReli
 class TestImagePublisher(Node):
     def __init__(self):
         super().__init__('test_image_publisher')
-        # QoS 설정
         qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.RELIABLE,
             history=QoSHistoryPolicy.KEEP_LAST,
