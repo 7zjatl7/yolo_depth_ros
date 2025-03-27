@@ -83,7 +83,7 @@ You need two models for `yolo_depth_ros`.  They can be downloaded from the follo
 - [Depth Anything](https://github.com/DepthAnything/Depth-Anything-V2)
 - [YOLOv12](https://github.com/sunsmarterjie/yolov12)
 
-
+<!-- 
 
 ## Demo
 Ground truth distance between objects from the camera in virtual world
@@ -94,4 +94,4 @@ Ground truth distance between objects from the camera in virtual world
 Estimated distance between objects from the camera in virtual world
 <p align="center">
   <img src="assets/result.png" width="100%">
-</p>
+</p> -->
