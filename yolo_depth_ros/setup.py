@@ -21,7 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             "goal_pub = yolo_depth_ros.goal_pub:main",
-            "img_pub = yolo_depth_ros.img_pub:main",
+            # "img_pub = yolo_depth_ros.img_pub:main",
             "yolo_node = yolo_depth_ros.yolo_node:main",
             "depth_node = yolo_depth_ros.depth_node:main",
             "tracking_node = yolo_depth_ros.tracking_node:main",
