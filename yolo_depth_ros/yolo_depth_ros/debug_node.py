@@ -15,9 +15,8 @@
 
 
 import cv2
-import random
+import math
 import numpy as np
-import matplotlib
 from typing import Tuple, List
 
 import rclpy
@@ -33,10 +32,15 @@ import message_filters
 from cv_bridge import CvBridge
 
 from sensor_msgs.msg import Image
-from yolo_msgs.msg import BoundingBox2D
-from yolo_msgs.msg import Detection
 from yolo_msgs.msg import DetectionArray
 from visualization_msgs.msg import Marker, MarkerArray
+from .utils.transform import extrinsics_from_global_pose, transform_from_tf, cam2world
+from .utils.gen_color import generate_color
+
+
+global_camera_position = (-17.96172, 127.59245, 5.63505)
+global_camera_euler = (-60.051, 38.465, 160.212)
+
 
 class DebugNode(LifecycleNode):
 
@@ -47,13 +51,11 @@ class DebugNode(LifecycleNode):
         self.cv_bridge = CvBridge()
         
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT.value)
-        self.declare_parameter("cmap_name", "Spectral_r")
 
 
     def on_configure(self, state: LifecycleState) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Configuring...")
 
-        self.cmap_name = self.get_parameter("cmap_name").get_parameter_value().string_value
         reliability = self.get_parameter("image_reliability").get_parameter_value().integer_value
 
         self.image_qos_profile = QoSProfile(
@@ -133,14 +135,13 @@ class DebugNode(LifecycleNode):
     def detections_cb(self, img_msg: Image, depth_msg: Image, detection_msg: DetectionArray) -> None:
 
         rgb_img = self.cv_bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
-        depth_img = self.cv_bridge.imgmsg_to_cv2(depth_msg, desired_encoding="bgr8")
+        depth_img = self.cv_bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
         dbg_rgb_img = rgb_img.copy()
         dbg_depth_img = depth_img.copy()
 
         detection_texts: List[Tuple[str, Tuple[int, int, int]]] = []
-
         for i, detection in enumerate(detection_msg.detections):
-            color = self.generate_color(i)
+            color = generate_color(i)
 
             bbox = detection.bbox
             cx = bbox.center.position.x
@@ -158,19 +159,31 @@ class DebugNode(LifecycleNode):
             px = getattr(detection.point_3d, "x", 0.0)
             py = getattr(detection.point_3d, "y", 0.0)
             pz = getattr(detection.point_3d, "z", 0.0)
+
+            R, t = extrinsics_from_global_pose(global_camera_position, global_camera_euler, euler_order='xyz')
+
+            # T_world_to_center = transform_from_tf(global_camera_position, global_camera_quat)
+            # global_point = cam2world(T_world_to_center,(px, py, pz))
+
+            camera_point = np.array([px, py, pz])
+            global_point = np.dot(R, camera_point) + t
+
+            self.get_logger().info(f"{global_point}")
+            distance = math.sqrt(px**2 + py**2 + pz**2)
             score = detection.score
             class_name = detection.class_name
 
-            text_str = f"{class_name} ({score:.2f}): {depth_val:.2f}m ({px:.2f},{py:.2f},{pz:.2f})"
+            text_str = f"{class_name} ({score:.2f}): {distance:.2f}m ({global_point[0]:.2f},{global_point[1]:.2f},{global_point[2]:.2f})"
+            # text_str = f"{class_name} ({score:.2f}): {distance:.2f}m ({px:.2f},{py:.2f},{pz:.2f})"
             detection_texts.append((text_str, color))
 
         line_height = 30
         x_right_margin = 10
         start_y = 30
-        img_h, img_w = dbg_rgb_img.shape[:2]
+        _, img_w = dbg_rgb_img.shape[:2]
 
         for i, (text_str, color) in enumerate(detection_texts):
-            (text_w, text_h), baseline = cv2.getTextSize(
+            (text_w, _), _ = cv2.getTextSize(
                 text_str, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
             )
             x_pos = img_w - x_right_margin - text_w
@@ -198,7 +211,7 @@ class DebugNode(LifecycleNode):
             )
 
         self._dbg_rgb_pub.publish(self.cv_bridge.cv2_to_imgmsg(dbg_rgb_img, encoding="bgr8"))
-        self._dbg_depth_pub.publish(self.cv_bridge.cv2_to_imgmsg(dbg_depth_img, encoding="bgr8"))
+        self._dbg_depth_pub.publish(self.cv_bridge.cv2_to_imgmsg(dbg_depth_img, encoding="passthrough"))
 
         marker_array = MarkerArray()
         for i, detection in enumerate(detection_msg.detections):
@@ -227,19 +240,8 @@ class DebugNode(LifecycleNode):
 
         self._marker_pub.publish(marker_array)
 
-    def generate_color(self, index: int) -> Tuple[int, int, int]:
-        """
-        index를 바탕으로 HSV 색을 생성한 뒤 BGR로 변환해 반환합니다.
-        Hue 범위(0~179)를 일정 간격(index*30)으로 증가시키고,
-        Saturation/Value는 고정된 값으로 지정합니다.
-        """
-        hue = (index * 30) % 180
-        sat = 200
-        val = 200
-        color_hsv = np.uint8([[[hue, sat, val]]])  # shape=(1,1,3)
-        color_bgr = cv2.cvtColor(color_hsv, cv2.COLOR_HSV2BGR)[0, 0]
-        # (B, G, R) = color_bgr
-        return (int(color_bgr[0]), int(color_bgr[1]), int(color_bgr[2]))
+
+
 
 
 def main():

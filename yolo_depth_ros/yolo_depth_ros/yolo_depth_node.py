@@ -10,6 +10,8 @@ from cv_bridge import CvBridge
 
 from yolo_msgs.msg import DetectionArray, Detection
 
+
+
 class YoloDepthNode(LifecycleNode):
 
     def __init__(self):
@@ -21,8 +23,8 @@ class YoloDepthNode(LifecycleNode):
 
         self.declare_parameter("fx", 1000.0)
         self.declare_parameter("fy", 1800.0)
-        self.declare_parameter("cx", 319.5)
-        self.declare_parameter("cy", 319.5)
+        self.declare_parameter("cx", 320.0)
+        self.declare_parameter("cy", 320.0)
 
         self.cv_bridge = CvBridge()
 
@@ -120,7 +122,7 @@ class YoloDepthNode(LifecycleNode):
             cy = int(bbox.center.position.y)            
             
             if 0 <= cy < cv_depth.shape[0] and 0 <= cx < cv_depth.shape[1]:
-                raw_depth = np.mean(cv_depth[cy, cx]) if cv_depth.ndim == 3 else cv_depth[cy, cx]
+                raw_depth = cv_depth[cy, cx, 1] if cv_depth.ndim == 3 else cv_depth[cy, cx]
                 if np.isnan(raw_depth) or np.isinf(raw_depth):
                     depth_val = 0.0
                 else:
@@ -139,7 +141,6 @@ class YoloDepthNode(LifecycleNode):
             det_msg.point_3d.z = round(Z,2)
 
             fused_msg.detections.append(det_msg)
-
         self._pub_fused.publish(fused_msg)
 
 

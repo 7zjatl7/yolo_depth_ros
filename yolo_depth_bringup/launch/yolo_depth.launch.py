@@ -13,12 +13,17 @@ def generate_launch_description():
 
         det_model = LaunchConfiguration("det_model")
         det_model_cmd = DeclareLaunchArgument(
-            "det_model", default_value="yolov8m.pt", description="YOLO detection model"
+            "det_model", default_value="yolov8m.pt", description="YOLO detection model path"
         )
 
         dep_model = LaunchConfiguration("dep_model")
         dep_model_cmd = DeclareLaunchArgument(
-            "dep_model", default_value="depth-anything/Depth-Anything-V2-Small-hf", description="Depth estimation model"
+            "dep_model", default_value="vitl", choices=["vits", "vitb", "vitl"], description="small, base, large depth model"
+        )
+
+        dep_model_path = LaunchConfiguration("dep_model_path")
+        dep_model_path_cmd = DeclareLaunchArgument(
+            "dep_model", default_value="depth-anything/Depth-Anything-V2-Small-hf", description="Depth estimation model path"
         )
 
         device = LaunchConfiguration("device")
@@ -54,6 +59,10 @@ def generate_launch_description():
         half = LaunchConfiguration("half")
         half_cmd = DeclareLaunchArgument(
             "half", default_value="False", description="Whether to enable half-precision (FP16) inference speeding up model inference with minimal impact on accuracy")
+
+        max_depth = LaunchConfiguration("max_depth")
+        max_depth_cmd = DeclareLaunchArgument(
+            "max_depth", default_value="50", description="Maximum number of depth allowed per image")
 
         max_det = LaunchConfiguration("max_det")
         max_det_cmd = DeclareLaunchArgument(
@@ -91,18 +100,10 @@ def generate_launch_description():
             "cy", default_value="319.5", description="Camera principal point y-coordinate (cy)"
         )
 
-        grayscale = LaunchConfiguration("grayscale")
-        grayscale_cmd = DeclareLaunchArgument(
-            "grayscale", default_value="False", description="Depth visualization mode: if True, use grayscale; if False, use color"
-        )
-        
-        cmap_name = LaunchConfiguration("cmap_name")
-        cmap_name_cmd = DeclareLaunchArgument(
-            "cmap_name", default_value="Spectral_r", description="Colormap name for depth visualization")
-
         namespace = LaunchConfiguration("namespace")
         namespace_cmd = DeclareLaunchArgument(
-            "namespace", default_value="yolo_depth", description="Namespace for the nodes")
+            "namespace", default_value="yolo_depth", description="Namespace for the nodes"
+        )
 
         
         detections_topic = "detections"
@@ -159,12 +160,12 @@ def generate_launch_description():
             parameters=[
                 {
                     "model": dep_model,
+                    "model_path": dep_model_path,
                     "device": device,
                     "enable": enable,
+                    "max_depth": max_depth,
                     "imgsz_height": imgsz_height,
                     "imgsz_width": imgsz_width,
-                    "grayscale": grayscale,
-                    "colormap": cmap_name,
                     "image_reliability": image_reliability,
                 }
             ],
@@ -182,7 +183,7 @@ def generate_launch_description():
                     "fx": fx,
                     "fy": fy,
                     "cx": cx,
-                    "cy": cy
+                    "cy": cy,
                 }
             ],
             remappings=[("detections", detections_topic)],
@@ -196,7 +197,6 @@ def generate_launch_description():
             parameters=[
                 {
                     "image_reliability": image_reliability,
-                    "cmap_name": cmap_name
                 }
             ],
             remappings=[("image_raw", input_image_topic)]
@@ -205,6 +205,7 @@ def generate_launch_description():
         return (
             det_model_cmd,
             dep_model_cmd,
+            dep_model_path_cmd,
             device_cmd,
             enable_cmd,
             threshold_cmd,
@@ -213,6 +214,7 @@ def generate_launch_description():
             imgsz_height_cmd,
             imgsz_width_cmd,
             half_cmd,
+            max_depth_cmd,
             max_det_cmd,
             augment_cmd,
             agnostic_nms_cmd,
@@ -221,8 +223,6 @@ def generate_launch_description():
             fy_cmd,
             cx_cmd,
             cy_cmd,
-            grayscale_cmd,
-            cmap_name_cmd,
             namespace_cmd,
             yolo_node_cmd,
             tracking_node_cmd,
